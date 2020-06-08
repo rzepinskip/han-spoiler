@@ -11,16 +11,16 @@ import sys
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-
 import tensorflow as tf
 import transformers
-from keras_han.model import HAN
 from nltk.tokenize import sent_tokenize
+from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
+
+from keras_han.model import HAN
 
 # Create a logger to provide info on the state of the
 # script
@@ -35,7 +35,7 @@ logger.addHandler(stdout)
 MAX_WORDS_PER_SENT = 100
 MAX_SENT = 15
 MAX_VOC_SIZE = 20000
-GLOVE_DIM = 100
+EMBEDDING_DIM = 100
 TEST_SPLIT = 0.2
 
 
@@ -125,7 +125,7 @@ logger.info("Creating embedding matrix using pre-trained GloVe vectors.")
 
 # Load the embeddings from a file
 embeddings = {}
-with open("./data/glove.6B.%dd.txt" % GLOVE_DIM, encoding="utf-8") as file:
+with open("./data/glove.6B.%dd.txt" % EMBEDDING_DIM, encoding="utf-8") as file:
     for line in file:
         values = line.split()
         word = values[0]
@@ -134,7 +134,7 @@ with open("./data/glove.6B.%dd.txt" % GLOVE_DIM, encoding="utf-8") as file:
         embeddings[word] = coefs
 
 # Initialize a matrix to hold the word embeddings
-embedding_matrix = np.random.random((len(word_tokenizer.word_index) + 1, GLOVE_DIM))
+embedding_matrix = np.random.random((len(word_tokenizer.word_index) + 1, EMBEDDING_DIM))
 
 # Let the padded indices map to zero-vectors. This will
 # prevent the padding from influencing the results
@@ -163,9 +163,12 @@ han_model = HAN(
     sentence_encoding_dim=100,
 )
 
-han_model.summary()
+# han_model.summary()
 
-han_model.compile(optimizer="adagrad", loss="categorical_crossentropy", metrics=["acc"])
+opt = tf.keras.optimizers.Adam(learning_rate=0.001)
+han_model.compile(
+    optimizer="adam", loss="categorical_crossentropy", metrics=["acc", tf.keras.metrics.AUC()],
+)
 
 # checkpoint_saver = ModelCheckpoint(
 #     filepath="./tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5",

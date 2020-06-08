@@ -7,7 +7,7 @@ from tensorflow.keras import backend as K
 
 
 class AttentionLayer(tensorflow.keras.layers.Layer):
-    def __init__(self, context_vector_length=100, **kwargs):
+    def __init__(self, context_vector_length=50, **kwargs):
         """
         An implementation of a attention layer. This layer
         accepts a 3d Tensor (batch_size, time_steps, input_dim) and
