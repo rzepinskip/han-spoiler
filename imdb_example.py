@@ -34,9 +34,9 @@ logger.addHandler(stdout)
 
 MAX_WORDS_PER_SENT = 100
 MAX_SENT = 15
-MAX_VOC_SIZE = 20000
-EMBEDDING_DIM = 100
-TEST_SPLIT = 0.2
+MAX_VOC_SIZE = 30000
+EMBEDDING_DIM = 300
+TEST_SPLIT = 1 / 8
 
 
 #####################################################
@@ -117,15 +117,16 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SPLIT)
 #####################################################
 # Word Embeddings                                   #
 #####################################################
-logger.info("Creating embedding matrix using pre-trained GloVe vectors.")
+logger.info("Creating embedding matrix using pre-trained vectors.")
 
 # Now, we need to build the embedding matrix. For this we use
-# a pretrained (on the wikipedia corpus) 100-dimensional GloVe
+# a pretrained (on the wikipedia corpus) 100-dimensional embeddings
 # model.
 
 # Load the embeddings from a file
 embeddings = {}
-with open("./data/glove.6B.%dd.txt" % EMBEDDING_DIM, encoding="utf-8") as file:
+with open("data/wiki-news-300d-1M.vec", encoding="utf-8") as file:
+    next(file)  # skip header
     for line in file:
         values = line.split()
         word = values[0]
@@ -163,11 +164,11 @@ han_model = HAN(
     sentence_encoding_dim=100,
 )
 
-# han_model.summary()
-
 opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 han_model.compile(
-    optimizer="adam", loss="categorical_crossentropy", metrics=["acc", tf.keras.metrics.AUC()],
+    optimizer="adam",
+    loss="categorical_crossentropy",
+    metrics=["acc", tf.keras.metrics.AUC()],
 )
 
 # checkpoint_saver = ModelCheckpoint(
@@ -179,7 +180,7 @@ han_model.compile(
 han_model.fit(
     X_train,
     y_train,
-    batch_size=20,
+    batch_size=32,
     epochs=10,
     validation_data=(X_test, y_test),
     # callbacks=[checkpoint_saver],
