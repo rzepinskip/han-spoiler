@@ -105,7 +105,7 @@ class HAN(Model):
 
         text_input = Input(shape=(max_sentences, summary_dim))
         encoded_sentences = Bidirectional(
-            GRU(int(encoding_dim / 2), return_sequences=True)
+            GRU(int(encoding_dim / 2), return_sequences=False)
         )(text_input)
         return Model(
             inputs=[text_input], outputs=[encoded_sentences], name="sentence_encoder"
@@ -134,13 +134,9 @@ class HAN(Model):
             self.max_sentences, self.word_encoding_dim, self.sentence_encoding_dim
         )(sentence_rep)
 
-        # We get the final representation by applying our attention mechanism
-        # to the encoded sentences
-        doc_summary = AttentionLayer(name="sentence_attention")(doc_rep)
-
         out_tensor = Dense(
             self.output_size, activation="softmax", name="class_prediction"
-        )(doc_summary)
+        )(doc_rep)
 
         return in_tensor, out_tensor
 
