@@ -4,26 +4,31 @@ review dataset. The goal is to predict whether a review is
 positive (5 star rating >=3) or negative (otherwise)
 """
 
+import csv
+import logging
 import re
+import sys
+
 import numpy as np
 import pandas as pd
-import logging
-import sys
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
-from keras.callbacks import ModelCheckpoint
-from keras.utils import to_categorical
-from nltk.tokenize import sent_tokenize
 from sklearn.model_selection import train_test_split
+
+import tensorflow as tf
+import transformers
 from keras_han.model import HAN
+from nltk.tokenize import sent_tokenize
+from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.utils import to_categorical
 
 # Create a logger to provide info on the state of the
 # script
 stdout = logging.StreamHandler(sys.stdout)
-stdout.setFormatter(logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-))
-logger = logging.getLogger('default')
+stdout.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
+logger = logging.getLogger("default")
 logger.setLevel(logging.INFO)
 logger.addHandler(stdout)
 
@@ -39,39 +44,33 @@ TEST_SPLIT = 0.2
 #####################################################
 logger.info("Pre-processsing data.")
 
-# Load Kaggle's IMDB example data
-data = pd.read_csv('./data/kaggle_imdb_train.tsv', sep='\t')
+DATA_SOURCES = {
+    "train": "https://spoiler-datasets.s3.eu-central-1.amazonaws.com/tvtropes_movie-train.balanced.csv",
+    "val": "https://spoiler-datasets.s3.eu-central-1.amazonaws.com/tvtropes_movie-dev1.balanced.csv",
+    "test": "https://spoiler-datasets.s3.eu-central-1.amazonaws.com/tvtropes_movie-test.balanced.csv",
+}
 
 
-# Do some basic cleaning of the review text
-def remove_quotations(text):
-    """
-    Remove quotations and slashes from the dataset.
-    """
-    text = re.sub(r"\\", "", text)
-    text = re.sub(r"\'", "", text)
-    text = re.sub(r"\"", "", text)
-    return text
+class TvTropesMovieSingleDataset:
+    def get_dataset(self, dataset_type):
+        X = list()
+        y = list()
+        with open(transformers.cached_path(DATA_SOURCES[dataset_type])) as file:
+            reader = csv.reader(file)
+            next(reader)  # skip header
+            for sentence, spoiler, verb, page, trope in reader:
+                label = 1 if spoiler == "True" else 0
+                X.append(sentence)
+                y.append(label)
+
+        return X, y
 
 
-def remove_html(text):
-    """
-    Very, very raw parser to remove HTML tags from
-    texts.
-    """
-    tags_regex = re.compile(r'<.*?>')
-    return tags_regex.sub('', text)
+x1, y1 = TvTropesMovieSingleDataset().get_dataset("train")
+x2, y2 = TvTropesMovieSingleDataset().get_dataset("val")
 
-
-data['review'] = data['review'].apply(remove_quotations)
-data['review'] = data['review'].apply(remove_html)
-data['review'] = data['review'].apply(lambda x: x.strip().lower())
-
-# Get the data and the sentiment
-reviews = data['review'].values
-target = data['sentiment'].values
-del data
-
+reviews = x1 + x2
+target = y1 + y2
 
 #####################################################
 # Tokenization                                      #
@@ -86,16 +85,12 @@ word_tokenizer.fit_on_texts(reviews)
 # shape (n_samples, MAX_SENT, MAX_WORDS_PER_SENT).
 # We zero-pad this matrix (this does not influence
 # any predictions due to the attention mechanism.
-X = np.zeros((len(reviews), MAX_SENT, MAX_WORDS_PER_SENT), dtype='int32')
+X = np.zeros((len(reviews), MAX_SENT, MAX_WORDS_PER_SENT), dtype="int32")
 
 for i, review in enumerate(reviews):
     sentences = sent_tokenize(review)
-    tokenized_sentences = word_tokenizer.texts_to_sequences(
-        sentences
-    )
-    tokenized_sentences = pad_sequences(
-        tokenized_sentences, maxlen=MAX_WORDS_PER_SENT
-    )
+    tokenized_sentences = word_tokenizer.texts_to_sequences(sentences)
+    tokenized_sentences = pad_sequences(tokenized_sentences, maxlen=MAX_WORDS_PER_SENT)
 
     pad_size = MAX_SENT - tokenized_sentences.shape[0]
 
@@ -103,8 +98,10 @@ for i, review in enumerate(reviews):
         tokenized_sentences = tokenized_sentences[0:MAX_SENT]
     else:
         tokenized_sentences = np.pad(
-            tokenized_sentences, ((0,pad_size),(0,0)),
-            mode='constant', constant_values=0
+            tokenized_sentences,
+            ((0, pad_size), (0, 0)),
+            mode="constant",
+            constant_values=0,
         )
 
     # Store this observation as the i-th observation in
@@ -113,7 +110,6 @@ for i, review in enumerate(reviews):
 
 # Transform the labels into a format Keras can handle
 y = to_categorical(target)
-
 # We make a train/test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SPLIT)
 
@@ -121,9 +117,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SPLIT)
 #####################################################
 # Word Embeddings                                   #
 #####################################################
-logger.info(
-    "Creating embedding matrix using pre-trained GloVe vectors."
-)
+logger.info("Creating embedding matrix using pre-trained GloVe vectors.")
 
 # Now, we need to build the embedding matrix. For this we use
 # a pretrained (on the wikipedia corpus) 100-dimensional GloVe
@@ -131,18 +125,16 @@ logger.info(
 
 # Load the embeddings from a file
 embeddings = {}
-with open('./data/glove.6b.%dd.txt' % GLOVE_DIM, encoding='utf-8') as file:
+with open("./data/glove.6B.%dd.txt" % GLOVE_DIM, encoding="utf-8") as file:
     for line in file:
         values = line.split()
         word = values[0]
-        coefs = np.asarray(values[1:], dtype='float32')
+        coefs = np.asarray(values[1:], dtype="float32")
 
         embeddings[word] = coefs
 
 # Initialize a matrix to hold the word embeddings
-embedding_matrix = np.random.random(
-    (len(word_tokenizer.word_index) + 1, GLOVE_DIM)
-)
+embedding_matrix = np.random.random((len(word_tokenizer.word_index) + 1, GLOVE_DIM))
 
 # Let the padded indices map to zero-vectors. This will
 # prevent the padding from influencing the results
@@ -163,24 +155,29 @@ logger.info("Training the model.")
 
 
 han_model = HAN(
-    MAX_WORDS_PER_SENT, MAX_SENT, 2, embedding_matrix,
-    word_encoding_dim=100, sentence_encoding_dim=100
+    MAX_WORDS_PER_SENT,
+    MAX_SENT,
+    2,
+    embedding_matrix,
+    word_encoding_dim=100,
+    sentence_encoding_dim=100,
 )
 
 han_model.summary()
 
-han_model.compile(
-    optimizer='adagrad', loss='categorical_crossentropy',
-    metrics=['acc']
-)
+han_model.compile(optimizer="adagrad", loss="categorical_crossentropy", metrics=["acc"])
 
-checkpoint_saver = ModelCheckpoint(
-    filepath='./tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5',
-    verbose=1, save_best_only=True
-)
+# checkpoint_saver = ModelCheckpoint(
+#     filepath="./tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5",
+#     verbose=1,
+#     save_best_only=True,
+# )
 
 han_model.fit(
-    X_train, y_train, batch_size=20, epochs=10,
+    X_train,
+    y_train,
+    batch_size=20,
+    epochs=10,
     validation_data=(X_test, y_test),
-    callbacks=[checkpoint_saver]
+    # callbacks=[checkpoint_saver],
 )

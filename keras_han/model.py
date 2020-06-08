@@ -1,18 +1,29 @@
-import keras
-from keras.layers import (
-    Dense, GRU, TimeDistributed, Input,
-    Embedding, Bidirectional, Lambda
-)
-from keras.models import Model
+import tensorflow
 from keras_han.layers import AttentionLayer
+from tensorflow.keras.layers import (
+    GRU,
+    Bidirectional,
+    Dense,
+    Embedding,
+    Input,
+    Lambda,
+    TimeDistributed,
+)
+from tensorflow.keras.models import Model
 
 
 class HAN(Model):
     def __init__(
-            self, max_words, max_sentences, output_size,
-            embedding_matrix, word_encoding_dim=200,
-            sentence_encoding_dim=200, inputs=None,
-            outputs=None, name='han-for-docla'
+        self,
+        max_words,
+        max_sentences,
+        output_size,
+        embedding_matrix,
+        word_encoding_dim=200,
+        sentence_encoding_dim=200,
+        inputs=None,
+        outputs=None,
+        name="han-for-docla",
     ):
         """
         A Keras implementation of Hierarchical Attention networks
@@ -35,12 +46,9 @@ class HAN(Model):
         self.word_encoding_dim = word_encoding_dim
         self.sentence_encoding_dim = sentence_encoding_dim
 
-
         in_tensor, out_tensor = self._build_network()
 
-        super(HAN, self).__init__(
-            inputs=in_tensor, outputs=out_tensor, name=name
-        )
+        super(HAN, self).__init__(inputs=in_tensor, outputs=out_tensor, name=name)
 
     def build_word_encoder(self, max_words, embedding_matrix, encoding_dim=200):
         """
@@ -54,7 +62,7 @@ class HAN(Model):
         :param encoding_dim: (int, should be even) The dimension of the
             bidirectional encoding layer. Half of the nodes are used in the
             forward direction and half in the backward direction.
-        :return: Instance of keras.Model
+        :return: Instance of tensorflow.keras.Model
         """
         assert encoding_dim % 2 == 0, "Embedding dimension should be even"
 
@@ -62,19 +70,21 @@ class HAN(Model):
         embedding_dim = embedding_matrix.shape[1]
 
         embedding_layer = Embedding(
-            vocabulary_size, embedding_dim,
-            weights=[embedding_matrix], input_length=max_words,
-            trainable=False
+            vocabulary_size,
+            embedding_dim,
+            weights=[embedding_matrix],
+            input_length=max_words,
+            trainable=False,
         )
 
-        sentence_input = Input(shape=(max_words,), dtype='int32')
+        sentence_input = Input(shape=(max_words,), dtype="int32")
         embedded_sentences = embedding_layer(sentence_input)
         encoded_sentences = Bidirectional(
             GRU(int(encoding_dim / 2), return_sequences=True)
         )(embedded_sentences)
 
         return Model(
-            inputs=[sentence_input], outputs=[encoded_sentences], name='word_encoder'
+            inputs=[sentence_input], outputs=[encoded_sentences], name="word_encoder"
         )
 
     def build_sentence_encoder(self, max_sentences, summary_dim, encoding_dim=200):
@@ -89,7 +99,7 @@ class HAN(Model):
         :param encoding_dim: (int, even) The dimension of the vector that
             summarizes sentences in context. Half is used in forward direction,
             half in backward direction.
-        :return: Instance of keras.Model
+        :return: Instance of tensorflow.keras.Model
         """
         assert encoding_dim % 2 == 0, "Embedding dimension should be even"
 
@@ -98,7 +108,7 @@ class HAN(Model):
             GRU(int(encoding_dim / 2), return_sequences=True)
         )(text_input)
         return Model(
-            inputs=[text_input], outputs=[encoded_sentences], name='sentence_encoder'
+            inputs=[text_input], outputs=[encoded_sentences], name="sentence_encoder"
         )
 
     def _build_network(self):
@@ -113,14 +123,12 @@ class HAN(Model):
             self.max_words, self.embedding_matrix, self.word_encoding_dim
         )
 
-        word_rep = TimeDistributed(
-            word_encoder, name='word_encoder'
-        )(in_tensor)
+        word_rep = TimeDistributed(word_encoder, name="word_encoder")(in_tensor)
 
         # Sentence Rep is a 3d-tensor (batch_size, max_sentences, word_encoding_dim)
-        sentence_rep = TimeDistributed(
-            AttentionLayer(), name='word_attention'
-        )(word_rep)
+        sentence_rep = TimeDistributed(AttentionLayer(), name="word_attention")(
+            word_rep
+        )
 
         doc_rep = self.build_sentence_encoder(
             self.max_sentences, self.word_encoding_dim, self.sentence_encoding_dim
@@ -128,23 +136,23 @@ class HAN(Model):
 
         # We get the final representation by applying our attention mechanism
         # to the encoded sentences
-        doc_summary = AttentionLayer(name='sentence_attention')(doc_rep)
+        doc_summary = AttentionLayer(name="sentence_attention")(doc_rep)
 
         out_tensor = Dense(
-            self.output_size, activation='softmax', name='class_prediction'
+            self.output_size, activation="softmax", name="class_prediction"
         )(doc_summary)
 
         return in_tensor, out_tensor
 
     def get_config(self):
         config = {
-            'max_words': self.max_words,
-            'max_sentences': self.max_sentences,
-            'output_size': self.output_size,
-            'embedding_matrix': self.embedding_matrix,
-            'word_encoding_dim': self.word_encoding_dim,
-            'sentence_encoding_dim': self.sentence_encoding_dim,
-            'base_config': super(HAN, self).get_config()
+            "max_words": self.max_words,
+            "max_sentences": self.max_sentences,
+            "output_size": self.output_size,
+            "embedding_matrix": self.embedding_matrix,
+            "word_encoding_dim": self.word_encoding_dim,
+            "sentence_encoding_dim": self.sentence_encoding_dim,
+            "base_config": super(HAN, self).get_config(),
         }
 
         return config
@@ -159,11 +167,9 @@ class HAN(Model):
         a instance of HAN model, but actually a standard
         Keras model that behaves exactly the same.
         """
-        base_config = config.pop('base_config')
+        base_config = config.pop("base_config")
 
-        return Model.from_config(
-            base_config, custom_objects=custom_objects
-        )
+        return Model.from_config(base_config, custom_objects=custom_objects)
 
     def predict_sentence_attention(self, X):
         """
@@ -173,14 +179,11 @@ class HAN(Model):
         :return: 2d array (num_obs, max_sentences) containing
             the attention weights for each sentence
         """
-        att_layer = self.get_layer('sentence_attention')
+        att_layer = self.get_layer("sentence_attention")
         prev_tensor = att_layer.input
 
         # Create a temporary dummy layer to hold the
         # attention weights tensor
-        dummy_layer = Lambda(
-            lambda x: att_layer._get_attention_weights(x)
-        )(prev_tensor)
+        dummy_layer = Lambda(lambda x: att_layer._get_attention_weights(x))(prev_tensor)
 
         return Model(self.input, dummy_layer).predict(X)
-

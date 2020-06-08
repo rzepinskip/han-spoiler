@@ -2,11 +2,11 @@
 File containing custom Keras layers that use the
 attention mechanism.
 """
+import tensorflow
+from tensorflow.keras import backend as K
 
-import keras
-from keras import backend as K
 
-class AttentionLayer(keras.layers.Layer):
+class AttentionLayer(tensorflow.keras.layers.Layer):
     def __init__(self, context_vector_length=100, **kwargs):
         """
         An implementation of a attention layer. This layer
@@ -25,15 +25,17 @@ class AttentionLayer(keras.layers.Layer):
 
         # Add a weights layer for the
         self.W = self.add_weight(
-            name='W', shape=(dim, self.context_vector_length),
-            initializer=keras.initializers.get('uniform'),
-            trainable=True
+            name="W",
+            shape=(dim, self.context_vector_length),
+            initializer=tensorflow.keras.initializers.get("uniform"),
+            trainable=True,
         )
 
         self.u = self.add_weight(
-            name='context_vector', shape=(self.context_vector_length, 1),
-            initializer=keras.initializers.get('uniform'),
-            trainable=True
+            name="context_vector",
+            shape=(self.context_vector_length, 1),
+            initializer=tensorflow.keras.initializers.get("uniform"),
+            trainable=True,
         )
 
         super(AttentionLayer, self).build(input_shape)
@@ -66,7 +68,7 @@ class AttentionLayer(keras.layers.Layer):
         att_weights = K.repeat_elements(att_weights, X.shape[-1], -1)
 
         # Multiply each input by its attention weights
-        weighted_input = keras.layers.Multiply()([X, att_weights])
+        weighted_input = tensorflow.keras.layers.Multiply()([X, att_weights])
 
         # Sum in the direction of the time-axis.
         return K.sum(weighted_input, axis=1)
@@ -75,8 +77,6 @@ class AttentionLayer(keras.layers.Layer):
         return input_shape[0], input_shape[2]
 
     def get_config(self):
-        config = {
-            'context_vector_length': self.context_vector_length
-        }
+        config = {"context_vector_length": self.context_vector_length}
         base_config = super(AttentionLayer, self).get_config()
         return {**base_config, **config}
