@@ -45,7 +45,7 @@ TEST_SPLIT = 1 / 8
 #####################################################
 logger.info("Pre-processsing data.")
 
-dataset = TvTropesBookSingleDataset()
+dataset = TvTropesMovieSingleDataset()
 x1, y1 = dataset.get_dataset("train")
 x2, y2 = dataset.get_dataset("val")
 
@@ -142,8 +142,8 @@ han_model = HAN(
     sentence_encoding_dim=100,
 )
 
-# loss = tf.keras.losses.BinaryCrossentropy(name="loss")
-loss = WeightedBinaryCrossEntropy(pos_weight=442475 / 89972, name="loss")
+loss = tf.keras.losses.BinaryCrossentropy(name="loss")
+# loss = WeightedBinaryCrossEntropy(pos_weight=442475 / 89972, name="loss")
 opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 han_model.compile(
     optimizer=opt,
