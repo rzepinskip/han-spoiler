@@ -20,8 +20,8 @@ class HAN(Model):
         max_words,
         max_sentences,
         embedding_matrix,
-        word_encoding_dim=200,
-        sentence_encoding_dim=200,
+        word_encoding_dim=100,
+        sentence_encoding_dim=100,
         inputs=None,
         outputs=None,
         name="han-for-docla",
@@ -77,9 +77,9 @@ class HAN(Model):
 
         sentence_input = Input(shape=(max_words,), dtype="int32")
         embedded_sentences = embedding_layer(sentence_input)
-        encoded_sentences = Bidirectional(GRU(50, return_sequences=True))(
-            embedded_sentences
-        )
+        encoded_sentences = Bidirectional(
+            GRU(int(encoding_dim / 2), return_sequences=True)
+        )(embedded_sentences)
 
         return Model(
             inputs=[sentence_input], outputs=[encoded_sentences], name="word_encoder"
@@ -102,7 +102,9 @@ class HAN(Model):
         assert encoding_dim % 2 == 0, "Embedding dimension should be even"
 
         text_input = Input(shape=(max_sentences, summary_dim))
-        encoded_sentences = Bidirectional(GRU(50, return_sequences=False))(text_input)
+        encoded_sentences = Bidirectional(
+            GRU(int(encoding_dim / 2), return_sequences=False)
+        )(text_input)
         return Model(
             inputs=[text_input], outputs=[encoded_sentences], name="sentence_encoder"
         )
