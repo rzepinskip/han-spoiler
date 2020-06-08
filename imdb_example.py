@@ -109,7 +109,7 @@ for i, review in enumerate(reviews):
     X[i] = tokenized_sentences[None, ...]
 
 # Transform the labels into a format Keras can handle
-y = to_categorical(target)
+y = target
 # We make a train/test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SPLIT)
 
@@ -154,33 +154,36 @@ for word, index in word_tokenizer.word_index.items():
 #####################################################
 logger.info("Training the model.")
 
-
 han_model = HAN(
     MAX_WORDS_PER_SENT,
     MAX_SENT,
-    2,
     embedding_matrix,
     word_encoding_dim=100,
     sentence_encoding_dim=100,
 )
 
+loss = tf.keras.losses.BinaryCrossentropy(name="loss")
 opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 han_model.compile(
-    optimizer="adam",
-    loss="categorical_crossentropy",
-    metrics=["acc", tf.keras.metrics.AUC()],
+    optimizer=opt,
+    loss=loss,
+    metrics=[
+        tf.keras.metrics.BinaryAccuracy(name="acc"),
+        tf.keras.metrics.AUC(name="auc"),
+        tf.keras.metrics.AUC(name="pr_auc", curve="PR"),
+    ],
 )
 
-# checkpoint_saver = ModelCheckpoint(
-#     filepath="./tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5",
-#     verbose=1,
-#     save_best_only=True,
-# )
+checkpoint_saver = ModelCheckpoint(
+    filepath="./tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5",
+    verbose=1,
+    save_best_only=True,
+)
 
 han_model.fit(
     X_train,
     y_train,
-    batch_size=32,
+    batch_size=64,
     epochs=10,
     validation_data=(X_test, y_test),
     # callbacks=[checkpoint_saver],

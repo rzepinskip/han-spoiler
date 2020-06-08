@@ -19,7 +19,6 @@ class HAN(Model):
         self,
         max_words,
         max_sentences,
-        output_size,
         embedding_matrix,
         word_encoding_dim=200,
         sentence_encoding_dim=200,
@@ -32,8 +31,6 @@ class HAN(Model):
         for document classification.
         :param max_words: The maximum number of words per sentence
         :param max_sentences: The maximum number of sentences
-        :param output_size: The dimension of the last layer (i.e.
-            the number of classes you wish to predict)
         :param embedding_matrix: The embedding matrix to use for
             representing words
         :param word_encoding_dim: The dimension of the GRU
@@ -43,7 +40,6 @@ class HAN(Model):
         """
         self.max_words = max_words
         self.max_sentences = max_sentences
-        self.output_size = output_size
         self.embedding_matrix = embedding_matrix
         self.word_encoding_dim = word_encoding_dim
         self.sentence_encoding_dim = sentence_encoding_dim
@@ -134,8 +130,6 @@ class HAN(Model):
             self.max_sentences, self.word_encoding_dim, self.sentence_encoding_dim
         )(sentence_rep)
         doc_rep = Dropout(0.5)(doc_rep)
-        out_tensor = Dense(
-            self.output_size, activation="softmax", name="class_prediction"
-        )(doc_rep)
+        out_tensor = Dense(1, activation="sigmoid", name="class_prediction")(doc_rep)
 
         return in_tensor, out_tensor
