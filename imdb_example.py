@@ -17,6 +17,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
+from tqdm import tqdm
 
 from keras_han.datasets import TvTropesBookSingleDataset, TvTropesMovieSingleDataset
 from keras_han.model import HAN
@@ -66,7 +67,7 @@ word_tokenizer.fit_on_texts(reviews)
 # any predictions due to the attention mechanism.
 X = np.zeros((len(reviews), MAX_SENT, MAX_WORDS_PER_SENT), dtype="int32")
 
-for i, review in enumerate(reviews):
+for i, review in tqdm(enumerate(reviews)):
     sentences = sent_tokenize(review)
     tokenized_sentences = word_tokenizer.texts_to_sequences(sentences)
     tokenized_sentences = pad_sequences(tokenized_sentences, maxlen=MAX_WORDS_PER_SENT)
@@ -106,7 +107,7 @@ logger.info("Creating embedding matrix using pre-trained vectors.")
 embeddings = {}
 with open("data/wiki-news-300d-1M.vec", encoding="utf-8") as file:
     next(file)  # skip header
-    for line in file:
+    for line in tqdm(file):
         values = line.split()
         word = values[0]
         coefs = np.asarray(values[1:], dtype="float32")
@@ -122,7 +123,7 @@ embedding_matrix[0] = 0
 
 # Loop though all the words in the word_index and where possible
 # replace the random initalization with the GloVe vector.
-for word, index in word_tokenizer.word_index.items():
+for word, index in tqdm(word_tokenizer.word_index.items()):
     embedding_vector = embeddings.get(word)
     if embedding_vector is not None:
         embedding_matrix[index] = embedding_vector
