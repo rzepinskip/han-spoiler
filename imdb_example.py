@@ -4,7 +4,6 @@ review dataset. The goal is to predict whether a review is
 positive (5 star rating >=3) or negative (otherwise)
 """
 
-import csv
 import logging
 import re
 import sys
@@ -12,7 +11,6 @@ import sys
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import transformers
 from nltk.tokenize import sent_tokenize
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -20,7 +18,9 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
 
+from keras_han.datasets import TvTropesBookSingleDataset, TvTropesMovieSingleDataset
 from keras_han.model import HAN
+from keras_han.utils import WeightedBinaryCrossEntropy
 
 # Create a logger to provide info on the state of the
 # script
@@ -44,30 +44,9 @@ TEST_SPLIT = 1 / 8
 #####################################################
 logger.info("Pre-processsing data.")
 
-DATA_SOURCES = {
-    "train": "https://spoiler-datasets.s3.eu-central-1.amazonaws.com/tvtropes_movie-train.balanced.csv",
-    "val": "https://spoiler-datasets.s3.eu-central-1.amazonaws.com/tvtropes_movie-dev1.balanced.csv",
-    "test": "https://spoiler-datasets.s3.eu-central-1.amazonaws.com/tvtropes_movie-test.balanced.csv",
-}
-
-
-class TvTropesMovieSingleDataset:
-    def get_dataset(self, dataset_type):
-        X = list()
-        y = list()
-        with open(transformers.cached_path(DATA_SOURCES[dataset_type])) as file:
-            reader = csv.reader(file)
-            next(reader)  # skip header
-            for sentence, spoiler, verb, page, trope in reader:
-                label = 1 if spoiler == "True" else 0
-                X.append(sentence)
-                y.append(label)
-
-        return X, y
-
-
-x1, y1 = TvTropesMovieSingleDataset().get_dataset("train")
-x2, y2 = TvTropesMovieSingleDataset().get_dataset("val")
+dataset = TvTropesBookSingleDataset()
+x1, y1 = dataset.get_dataset("train")
+x2, y2 = dataset.get_dataset("val")
 
 reviews = x1 + x2
 target = y1 + y2
@@ -109,7 +88,7 @@ for i, review in enumerate(reviews):
     X[i] = tokenized_sentences[None, ...]
 
 # Transform the labels into a format Keras can handle
-y = target
+y = np.array(target)
 # We make a train/test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SPLIT)
 
@@ -162,7 +141,8 @@ han_model = HAN(
     sentence_encoding_dim=100,
 )
 
-loss = tf.keras.losses.BinaryCrossentropy(name="loss")
+# loss = tf.keras.losses.BinaryCrossentropy(name="loss")
+loss = WeightedBinaryCrossEntropy(pos_weight=442475 / 89972, name="loss")
 opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 han_model.compile(
     optimizer=opt,
